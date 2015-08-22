@@ -1,0 +1,92 @@
+{
+	'core': {
+		'user_management': {
+			'user': [
+				{'login': 'door', 'password': 'pi', 'groups': ['admins', 'tel_admin'], 'phone': '**620'},
+				{'login': 'motom', 'password': '001', 'groups': ['admins', 'tel_admin', 'webservice'], 'phone': ['**621', '0178333333333']},
+				{'login': 'nachbar1', 'password': 'irgendwas', 'groups': 'tel_admin', 'phone': '**622'},
+				{'login': 'OpenHAB', 'password': 'irgendwas_neues', 'groups': 'webservice'},
+			]
+		},
+		'event_handler': {
+			'event_log' {
+				'typ': 'sqllite',
+				'file': '!BASE_PATH!/conf/event_log.db'
+			}
+		}
+	},
+	'interfaces' : [
+		{
+			'name': 'virtuelles_keyboard',
+			'typ': 'interfaces.hardware.filesystem',
+			'input': [
+				{'technical_name': '/var/doorpi/filesystem/input/nummer_eins', 'name': 'Eingang_1', 'high_value': '1', 'low_value': '0'}
+			],
+			'output': [
+				{'technical_name': '/var/doorpi/filesystem/output/nummer_zwei', 'name': 'Ausgang_2'}
+			]
+		},{
+			'name': 'mein_GPIO_Board',
+			'typ': 'interfaces.hardware.gpio',
+			'input': [
+				{'technical_name': '16', 'name': 'Eingang_1'}
+			],
+			'output': [
+				{'technical_name': '18', 'name': 'Ausgang_2'}
+			]
+		},{
+			'name': 'TelefonKontakt',
+			'typ': 'interfaces.sipphone.linphone',
+			'input': [
+				{'technical_name': '#', 'name': 'Tueroeffner'}
+			],
+			'config': {
+				'permissions': 'tel_admin',
+				'sipserver': [{
+					'username': 'linphone',
+					'password': 'pw',
+					'realm': 'der.realm.halt',
+					'server': ''
+				},{
+					'username': 'doorpi',
+					'password': 'anders_pw',
+					'realm': 'sip.linphone.org',
+					'server': 'sip.linphone.org'
+				}]
+			}
+		},{
+			'name': 'DoorPiWeb',
+			'typ': 'interfaces.web.webserver',
+			'config': {
+				'port': '80',
+				'permissions': {
+					'admins': [
+						'/dashboard/pages/.*'
+					]
+				}
+			}
+		},{
+			'name': 'Webservice',
+			'typ': 'interfaces.web.webservice',
+			'config': {
+				'port': '10101',
+				'permissions': {
+					'webservice': [
+						'/dashboard/pages/.*'
+					]
+				}
+			}
+		}
+	],
+	'actions': [
+		{'name': 'Klingel EG', 'action': 'actions.call', 'parameters': {'number': '**620'}},
+		{'name': 'Foto aufnehmen', 'action': 'actions.take_picture', 'parameters': {'file': '/var/doorpi/_last_pic.jpeg'}},
+		{'name': 'E-Mail mit Bild', 'action': 'actions.mailto', 'parameters': {'to': 'email@adresse.de', 'attachment': '/var/doorpi/_last_pic.jpeg', 'subject': 'es hat geklingelt', 'text': 'schau mal, ob Du den kennst'}}
+		{'name': 'Rundmail ohne Bild', 'action': 'actions.mailto', 'parameters': {'to': ['email@adresse.de', 'zweite_email@adresse.de'], 'subject': 'hat jemand reagiert?', 'text': 'diesmal ohne Bild'}}
+	],
+	'events': [
+		{'name': 'OnKeyPressed_mein_GPIO_Board.Eingang_1', 'actions': [
+			'Foto aufnehmen', 'E-Mail mit Bild', 'Klingel EG'
+		]}
+	]
+}
