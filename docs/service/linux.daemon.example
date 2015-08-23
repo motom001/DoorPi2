@@ -1,0 +1,83 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          !PROJECT!
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: !PROJECT!
+# Description:       !PROJECT_DESCRIPTION!
+### END INIT INFO
+
+. /lib/lsb/init-functions
+
+NAME=!PROJECT!
+DESC="!PROJECT_DESCRIPTION!"
+DOORPI_PATH=!BASE_PATH!
+DAEMON=$DOORPI_PATH/doorpi/main.py
+DAEMON_ARGS="!DAEMON_DEFAULT_ARGUMENTS!"
+PIDFILE=!DAEMON_PIDFILE!
+SCRIPTNAME=!DAEMON_TARGET_FILENAME!
+
+# Exit if the package is not installed
+if [ none != "$DAEMON" ] && [ ! -x "$DAEMON" ] ; then
+        exit 0
+fi
+
+# Read configuration variable file if it is present
+[ -r /etc/default/$NAME ] && . /etc/default/$NAME
+
+# Load the VERBOSE setting and other rcS variables
+. /lib/init/vars.sh
+if [ -t 0 ] ; then # Be verbose when called from a terminal
+    VERBOSE=yes
+fi
+
+do_start_cmd()
+{
+        status_of_proc "$DAEMON" "$NAME" > /dev/null && return 1
+       	$DAEMON start $DAEMON_ARGS || return 2
+}
+
+do_stop_cmd()
+{
+	status_of_proc "$DAEMON" "$NAME" > /dev/null || return 1
+	$DAEMON stop || return 2
+	rm -f $PIDFILE
+	return 0
+}
+
+case "$1" in
+	start)
+		[ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC" "$NAME"
+		do_start_cmd
+		case "$?" in
+			0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+			2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+		esac
+		;;
+	stop)
+		[ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
+		do_stop_cmd
+		case "$?" in
+			0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+			2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+		esac
+		;;
+	restart)
+		[ "$VERBOSE" != no ] && log_daemon_msg "Restarting $DESC" "$NAME"
+		do_stop_cmd
+		do_start_cmd
+		case "$?" in
+			0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+			2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+		esac
+		;;
+	status)
+		status_of_proc "$DAEMON" "$NAME" && return 0 || return $?
+		;;
+	*)
+		echo "Usage: $SCRIPTNAME {start|stop|status|restart}" >&2
+		exit 3
+		;;
+esac

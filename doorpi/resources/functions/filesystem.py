@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+from resource import getrlimit, RLIMIT_NOFILE
 
 def get_base_dir(file):
     os.path.dirname(os.path.dirname(os.path.abspath(file)))
