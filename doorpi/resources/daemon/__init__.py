@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 
-import main
-logger = main.DOORPI.register_modul(__name__)
+from main import DOORPI
+logger = DOORPI.register_module(__name__, return_new_logger = True)
+
+class DaemonRunnerStopFailureError(Exception): pass
+class DaemonRunnerStartFailureError(Exception): pass
+class DaemonRunnerInvalidActionError(Exception): pass
 
 def load_daemon_libs():
     try:
@@ -10,7 +14,7 @@ def load_daemon_libs():
         from daemon.runner import DaemonRunnerStartFailureError
         from daemon.runner import DaemonRunnerStopFailureError
         return True
-    except ImportError as exp:
+    except ImportError:
         return False
 
 DAEMON_AVAILABLE = load_daemon_libs()

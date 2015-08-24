@@ -8,10 +8,12 @@ logger = init_own_logger(__name__)
 import time, os
 import main
 
+class CorruptConfigFileException(Exception): pass
+
 class DoorPi(object):
     _instance = None
     _argumentes = None
-    _modules = []
+    _modules = dict()
 
     _destroy = False
     _prepared = False
@@ -31,6 +33,19 @@ class DoorPi(object):
 
     @property
     def logger(self): return self._logger
+    @property
+    def config(self): return self._config_handler
+    @property
+    def events(self): return self._event_handler
+    @property
+    def interfaces(self): return self._interface_handler
+    @property
+    def arguments(self): return self._argumentes
+    @property
+    def CONST(self): return main.CONST
+
+    @staticmethod
+    def parse_string(raw_string, kwargs = None): return main.parse_string(raw_string, kwargs)
 
     def __init__(self,):
         pass
@@ -43,9 +58,6 @@ class DoorPi(object):
 
     def prepare(self, arguments):
         if arguments: self._argumentes = arguments
-        if not self._logger:
-            logger.debug('set new logger DoorPiMemoryLog')
-            self._logger = DoorPiMemoryLog()
 
         # for start as daemon - if start as app it will not matter to load this vars
         self.stdin_path = main.parse_string(main.CONST.DAEMON_STDIN_PATH)
@@ -54,15 +66,32 @@ class DoorPi(object):
         self.pidfile_path =  main.parse_string(main.CONST.DAEMON_PIDFILE)
         self.pidfile_timeout = main.CONST.DAEMON_PIDFILE_TIMEOUT
 
+        if not self._logger:
+            logger.debug('set new logger DoorPiMemoryLog')
+            self._logger = DoorPiMemoryLog()
+
+        # load now the libs, because now DoorPi can receive the modul_register
+        from resources.config import ConfigHandler
+        from resources.event_handler import EventHandler
+        from resources.interface_handler import InterfaceHandler
+
+        try:
+            self._config_handler = ConfigHandler().start()
+            logger.debug(self._config_handler)
+            self._event_handler = EventHandler().start()
+            self._interface_handler = InterfaceHandler().start()
+        except Exception as exp:
+            raise CorruptConfigFileException(exp)
+
         self._prepared = True
 
     def start(self, start_as_daemon = True):
         self._start_as_daemon = start_as_daemon
         if not self._prepared: self.prepare()
         logger.debug('start')
-        while True:
-            #time.sleep(0.1)
-            logger.debug('wait another second and DoorPiMemoryLog is %s entries long'%len(self.logger.log))
+        #while True:
+        #    time.sleep(0.1)
+        #    logger.debug('wait another second and DoorPiMemoryLog is %s entries long'%len(self.logger.log))
         return self
 
     def destroy(self):
@@ -71,18 +100,34 @@ class DoorPi(object):
         if not self._start_as_daemon: logger.info('======== DoorPi successfully shutdown ========')
         return self
 
-    def test(self):
-        logger.debug('test')
+    def restart_module(self, module_name):
+        if module_name not in self._modules: return False
+        if self._modules[module_name]['stop_function']:
+            try:
+                self._modules[module_name]['stop_function']()
+            except Exception as exp:
+                logger.exception('failed to stop module %s with error %s', module_name, exp)
 
-    def register_modul(self, modul_name):
-        logger.debug("register modul_name")
-        self._modules.append({
-            'time': time.time(),
-            'name': modul_name
-        })
+    def unregister_module(self, module_name, execute_stop_function = False):
+        if module_name not in self._modules: return False
+        if execute_stop_function and self._modules[module_name]['stop_function']:
+            try:
+                self._modules[module_name]['stop_function']
+            except Exception as exp:
+                logger.exception('failed to stop module')
+        del self._modules[module_name]
+        return True
+
+    def register_module(self, module_name, start_function = None, stop_function = None, return_new_logger = False):
+        logger.debug("register module %s", module_name)
+        self._modules[module_name] = dict(
+            timestamp = time.time(),
+            start_function = start_function,
+            stop_function = stop_function
+        )
+        if not return_new_logger: return True
         from resources.logging import init_own_logger
-        new_logger = init_own_logger(modul_name)
-        new_logger.debug('load %s'%modul_name)
+        new_logger = init_own_logger(module_name)
         return new_logger
 
     run = start

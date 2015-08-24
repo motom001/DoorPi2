@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import main
-logger = main.DOORPI.register_modul(__name__)
+from main import DOORPI
+logger = DOORPI.register_module(__name__, return_new_logger = True)
 
 import resources.external.pip as PIP
 AUTOINSTALL_POSSIBLE = PIP.PIP_AVAILABLE
@@ -80,6 +80,3 @@ def write_parsed_daemon_file():
     chmod(special_placeholder['DAEMON_TARGET_FILENAME'], get_file_attributes(special_placeholder['DAEMON_TARGET_FILENAME']).st_mode | ExecutableBit)
     return special_placeholder['DAEMON_TARGET_FILENAME']
 
-class DaemonRunnerStopFailureError(Exception): pass
-class DaemonRunnerStartFailureError(Exception): pass
-class DaemonRunnerInvalidActionError(Exception): pass
