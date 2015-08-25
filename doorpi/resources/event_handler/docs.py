@@ -2,9 +2,6 @@
 
 from main import DOORPI
 
-def test_function():
-    print("test_function")
-
 DOCUMENTATION = dict(
     fulfilled_with_one = False,
     text_description = '''
@@ -23,7 +20,7 @@ Die ausgelösten Events werden in einer Datenbank (SQLLite) gespeichert und kön
     ],
     auto_install = dict(
         available = True,
-        install = [test_function, test_function],
+        install = [],
         uninstall = [],
         update = []
     ),
@@ -69,7 +66,7 @@ Die ausgelösten Events werden in einer Datenbank (SQLLite) gespeichert und kön
             text_test =             'Der Status kann gestestet werden, in dem im Python-Interpreter <code>import sqlite3</code> eingeben wird.',
             text_configuration =    '',
             configuration = [
-                dict( json_path = 'resources/event_handler/event_log/typ', type = 'string', default = 'sqllite', mandatory = False, description = 'Typ der Event_Hanler Datenbank (aktuell nur sqllite)'),
+                dict( json_path = 'resources/event_handler/event_log/typ', type = 'string', default = 'sqllite', mandatory = False, description = 'Typ der Event_Handler Datenbank (aktuell nur sqllite)'),
                 dict( json_path = 'resources/event_handler/event_log/connection_string', type = 'string', default = '!BASEPATH!/conf/eventlog.db', mandatory = False, description = 'Ablageort der SQLLite Datenbank für den Event-Handler.')
             ],
             text_links = {

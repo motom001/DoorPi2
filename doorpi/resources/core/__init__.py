@@ -70,28 +70,29 @@ class DoorPi(object):
             logger.debug('set new logger DoorPiMemoryLog')
             self._logger = DoorPiMemoryLog()
 
-        # load now the libs, because now DoorPi can receive the modul_register
+        # load now the libs, because now DoorPi can receive the module_register
         from resources.config import ConfigHandler
         from resources.event_handler import EventHandler
         from resources.interface_handler import InterfaceHandler
 
-        try:
-            self._config_handler = ConfigHandler().start()
-            logger.debug(self._config_handler)
-            self._event_handler = EventHandler().start()
-            self._interface_handler = InterfaceHandler().start()
-        except Exception as exp:
-            raise CorruptConfigFileException(exp)
+        #try:
+        self._config_handler = ConfigHandler()
+        self._event_handler = EventHandler()
+        self._interface_handler = InterfaceHandler()
+
+        for module in [self._config_handler, self._event_handler, self._interface_handler]:
+            module.start()
+
+        #except Exception as exp:
+        #    raise CorruptConfigFileException(exp)
 
         self._prepared = True
 
     def start(self, start_as_daemon = True):
-        self._start_as_daemon = start_as_daemon
-        if not self._prepared: self.prepare()
         logger.debug('start')
-        #while True:
-        #    time.sleep(0.1)
-        #    logger.debug('wait another second and DoorPiMemoryLog is %s entries long'%len(self.logger.log))
+        self._start_as_daemon = start_as_daemon
+        if not self._prepared: return False
+        while self._event_handler.heart_beat(): pass
         return self
 
     def destroy(self):
@@ -119,7 +120,10 @@ class DoorPi(object):
         return True
 
     def register_module(self, module_name, start_function = None, stop_function = None, return_new_logger = False):
-        logger.debug("register module %s", module_name)
+        if module_name in self._modules:
+            logger.debug("update register module %s", module_name)
+        else:
+            logger.debug("register module %s", module_name)
         self._modules[module_name] = dict(
             timestamp = time.time(),
             start_function = start_function,

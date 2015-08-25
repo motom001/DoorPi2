@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 # system modules
@@ -8,7 +8,7 @@ import argparse
 import logging
 import logging.handlers
 
-# self-import to prevent recursiv imports later
+# self-import to prevent endless imports later
 import main
 
 # doorpi modules and doorpi itself
@@ -26,7 +26,6 @@ from resources.auto_install import install as auto_install, uninstall as auto_un
 
 BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONST.USED_PYTHON_VERSION = "%s.%s"%(sys.version_info.major, sys.version_info.minor)
-
 
 def parse_string(raw_string, kwargs = None):
     var_dict = globals()

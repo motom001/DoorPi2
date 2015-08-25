@@ -6,10 +6,10 @@ logger = DOORPI.register_module(__name__, return_new_logger = True)
 def get_special_placeholder():
     from platform import system
     return {
-        'DAEMON_SOURCE_FILENAME':   DOORPI.parse_string(DOORPI.CONST.DAEMON_FILE[system()]['source']),
-        'DAEMON_TARGET_FILENAME':   DOORPI.parse_string(DOORPI.CONST.DAEMON_FILE[system()]['target']),
-        'DAEMON_INSTALL_COMMAND':   DOORPI.parse_string(DOORPI.CONST.DAEMON_FILE[system()]['install_command']),
-        'DAEMON_UNINSTALL_COMMAND': DOORPI.parse_string(DOORPI.CONST.DAEMON_FILE[system()]['uninstall_command']),
+        'DAEMON_SOURCE_FILENAME':   DOORPI.parse_string(DOORPI.CONST.DAEMON_FILE['source']),
+        'DAEMON_TARGET_FILENAME':   DOORPI.parse_string(DOORPI.CONST.DAEMON_FILE['target']),
+        'DAEMON_INSTALL_COMMAND':   DOORPI.parse_string(DOORPI.CONST.DAEMON_FILE['install_command']),
+        'DAEMON_UNINSTALL_COMMAND': DOORPI.parse_string(DOORPI.CONST.DAEMON_FILE['uninstall_command']),
         'DAEMON_STDIN_PATH':        DOORPI.CONST.DAEMON_STDIN_PATH,
         'DAEMON_STDOUT_PATH':       DOORPI.CONST.DAEMON_STDOUT_PATH,
         'DAEMON_STDERR_PATH':       DOORPI.CONST.DAEMON_STDERR_PATH,

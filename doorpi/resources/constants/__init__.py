@@ -20,7 +20,7 @@ DAEMON_PIDFILE = '/var/run/doorpi.pid'
 DAEMON_PIDFILE_TIMEOUT = 5
 
 DAEMON_FILE = {
-    'Linux': {'source': '!BASE_PATH!/docs/service/linux.daemon.example', 'target': '/etc/init.d/doorpi', 'uninstall_command': 'update-rc.d doorpi remove', 'install_command': 'update-rc.d doorpi defaults'}
+    'source': '!BASE_PATH!/docs/service/linux.daemon.example', 'target': '/etc/init.d/doorpi', 'uninstall_command': 'update-rc.d doorpi remove', 'install_command': 'update-rc.d doorpi defaults'
 }
 
 DAEMON_DEFAULT_ARGUMENTS = "--logfile "+LOG_DEFAULT_FILENAME
@@ -32,3 +32,15 @@ USED_PYTHON_VERSION = ''
 
 PIP_GENERAL_DEFAULT_ARGUMENTS = ['--disable-pip-version-check', '-q']
 PIP_NOT_INSTALLED_ERROR = 'https://github.com/motom001/DoorPi/wiki/FAQ#wie-installiere-ich-pip'
+
+HEART_BEAT_BASE_VALUE = 0.002
+HEART_BEAT_REALTIME_VALUE = 0.2
+HEART_BEAT_LEVEL_CRITICAL = 10
+HEART_BEAT_LEVEL_ERROR = 25
+HEART_BEAT_LEVEL_WARNING = 50
+HEART_BEAT_LEVEL_INFO = 100
+HEART_BEAT_LEVEL_DEBUG = 1500
+
+
+MINUTE_RANGE = range(0, 60)
+HOUR_RANGE = range(0, 23)
