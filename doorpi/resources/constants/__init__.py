@@ -11,6 +11,10 @@ LOG_DEFAULT_FILENAME = '/var/log/doorpi/doorpi.log'
 # section CONFIG
 CONFIG_DEFAULT_FILENAME = '!BASE_PATH!/config/doorpi.json'
 CONFIG_LAST_WORKING_FILENAME = '!BASE_PATH!/config/_last_working_doorpi_config.json'
+CONFIG_PASSWORD_KEYS = ['password']
+
+DOORPI_SHUTDOWN_TIMEOUT = 5
+DOORPI_SHUTDOWN_TIMEOUT_CHECK_INTERVAL = 0.5
 
 # section daemon
 DAEMON_STDIN_PATH = '/dev/null'
@@ -44,3 +48,12 @@ HEART_BEAT_LEVEL_DEBUG = 1500
 
 MINUTE_RANGE = range(0, 60)
 HOUR_RANGE = range(0, 23)
+
+INTERFACES_BASE_IMPORT_PATH = 'plugins.interfaces.'
+INTERFACES_HARDWARE_DEFAULT_INPUT_EVENTS = ['OnInputActive', 'OnInputInactive', 'OnInputChange']
+INTERFACES_HARDWARE_DEFAULT_OUTPUT_EVENTS = ['OnOutputActive', 'OnOutputInactive', 'OnOutputChange']
+INTERFACES_HARDWARE_INCOMING_OUTPUT_EVENTS_HIGH = ['OnSetOutput', 'OnSetOutputHigh']
+INTERFACES_HARDWARE_INCOMING_OUTPUT_EVENTS_LOW = ['OnSetOutputLow']
+
+HIGH_LEVEL = ['1', 'high', 'on', 'true', True, 1]
+LOW_LEVEL = ['0', 'low', 'off', 'false', False, 0]

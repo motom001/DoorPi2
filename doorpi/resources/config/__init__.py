@@ -15,6 +15,9 @@ class ConfigHandler:
     @property
     def json_pretty_printing(self): return json.dumps(self._config_object, sort_keys = True, indent = 4, separators = (',', ': '))
 
+    @staticmethod
+    def dump_object(object): return json.dumps(object, sort_keys = True, indent = 4, separators = (',', ': '))
+
     def __init__(self):
         pass
 
@@ -27,20 +30,55 @@ class ConfigHandler:
     def stop(self):
         logger.debug("stop ConfigHandler")
 
-    def load_config_from_configfile(self, config_file = None):
+    @staticmethod
+    def load_config_from_configfile(config_file = None):
         with open(DOORPI.parse_string(config_file)) as data_file:
             config_object = json.load(data_file)
         return config_object
 
-    def get_by_path(self, json_path, default = None, config_object = None, module_name = None):
-        # TODO: hole aus Docu den Parameter und nutze defaultund type für bessere Kontrolle
+    @staticmethod
+    def get_module_documentation_by_module_name(module_name):
+        """
+        Load module documentation for given module name.
+        :param module_name: name of module
+        :return: dict in form of documentation dict or empty dict if not found
+        """
+        try:
+            return importlib.import_module(module_name+'.docs').DOCUMENTATION
+        except:
+            logger.warning('no docs founded for %s', module_name)
+            return None
+
+    def get_by_path(self, json_path, default = None, config_object = None, function = 'value'):
+        # TODO: hole aus Docu den Parameter und nutze default und type für bessere Kontrolle
         # dict( json_path = 'resources/event_handler/event_log/typ', type = 'string', default = 'sqllite', mandatory = False, description = 'Typ der Event_Handler Datenbank (aktuell nur sqllite)')
-        if default: logger.warning('default given as parameter for %s', json_path)
+        #if default: logger.warning('default given as parameter for %s', json_path)
+        use_default = False
         try:
             if not config_object: config_object = self._config_object
-            return get_by_json_path(config_object, json_path, default)
-        except:
-            return default
+            value = get_by_json_path(config_object, json_path)
+        except Exception as exp:
+            #logger.debug('failed to get %s with error %s', json_path, exp)
+            value = default
+            use_default = True
+
+        try:
+            if function == 'value': pass
+            elif function == 'keys': value = value.keys()
+            elif function == 'len': value = len(value)
+            elif function == 'length': value = len(value)
+        except Exception as exp:
+            logger.error('failed to prepare value with function %s with error %s', function, exp)
+
+        if value == default and use_default: log_message = "%s of %s: %s (use default)"
+        elif value == default: log_message = "%s of %s: %s (was default)"
+        else: log_message = "%s of %s: %s"
+
+        if json_path.split('.')[-1] in DOORPI.CONST.CONFIG_PASSWORD_KEYS:
+            logger.info(log_message, function, json_path, '*********')
+        else:
+            logger.info(log_message, function, json_path, str(value))
+        return value
 
     def get_config_from_documentation_object(self, documentation_object):
         logger.debug('start get_config_from_documentation_object')

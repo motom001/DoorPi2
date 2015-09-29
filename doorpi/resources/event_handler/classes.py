@@ -5,67 +5,72 @@ from main import DOORPI
 logger = DOORPI.register_module(__name__, return_new_logger = True)
 
 from time import sleep
-import importlib
+from inspect import getargspec
 
-class SingleAction:
-    action_name = None
-    single_fire_action = False
+
+class MessageBaseClass(object):
+
+    sender = ''
+    event_name = ''
+    parameters = dict()
+
+    def fire(self):
+        pass
+
+    def get(self):
+        return self.__dict__
+
+class EventBaseClass:
+    def __init__(self, event_name):
+        self.name = event_name
+        self.sources = []
+        self.actions = []
+
+class ActionBaseClass:
+    @property
+    def single_fire_action(self):
+        return 'single_fire_action' in self._kwargs.keys() and self._kwargs['single_fire_action'] is True
+
+    @property
+    def id(self): return self._id
 
     @property
     def name(self):
-        return "%s with args %s and kwargs %s" % (
-            self.action_name,
-            self.__args,
-            self.__kwargs
-        )
+        if len(self._kwargs):
+            return "[%s] %s with kwargs %s" % (
+                self.id,
+                self.action_name,
+                self._kwargs
+            )
+        else:
+            return "[%s] %s" % (
+                self.id,
+                self.action_name
+            )
 
-    def __init__(self, callback, *args, **kwargs):
-        self.__callback = callback
-        self.__args = args
-        self.__kwargs = kwargs
+    def __init__(self, callback, id = None, **kwargs):
+        self._id = id or DOORPI.generate_id(prefix = 'Action_')
+        self._callback = callback
+        self._kwargs = kwargs
         if len(self.__class__.__bases__) is 0:
             self.action_name = str(callback)
         else:
             self.action_name = self.__class__.__name__
 
-    def __str__(self):
-        return self.name
+    def run(self, **kwargs):
+        kwargs.update(self._kwargs)
+        arg_spec = getargspec(self._callback)
+        if arg_spec.keywords is not None:
+            return self._callback(kwargs)
 
-    def run(self, silent_mode = False):
-        if not silent_mode:
-            logger.info('run %s with args %s and kwargs %s',
-                         self.__class__.__name__,
-                         self.__args,
-                         self.__kwargs
-            )
-        try:
-            if len(self.__args) is not 0 and len(self.__kwargs) is not 0:
-                #print "args and kwargs"
-                return self.__callback(*self.__args, **self.__kwargs)
-            elif len(self.__args) is 0 and len(self.__kwargs) is not 0:
-                #print "no args but kwargs"
-                return self.__callback(**self.__kwargs)
-            elif len(self.__args) is not 0 and len(self.__kwargs) is 0:
-                #print "args and no kwargs"
-                return self.__callback(*self.__args)
-            else:
-                #print "no args and no kwargs"
-                return self.__callback()
-        except TypeError as ex:
-            print ex
+        needed_arguments = {}
+        for given_argument in kwargs.keys():
+            if given_argument in arg_spec.args:
+                needed_arguments[given_argument] = kwargs[given_argument]
+        return self._callback(**needed_arguments)
 
-    @staticmethod
-    def from_string(config_string):
-        try:
-            action_name = config_string.split(':', 1)[0]
-            try: parameters = config_string.split(':', 1)[1]
-            except: parameters = ""
-            return importlib.import_module('action.SingleActions.'+action_name).get(
-                parameters
-            )
-        except:
-            logger.exception('error while creating SingleAction from config string: %s',config_string)
-            return None
+    def to_string(self): return self.name
+    __str__ = to_string
 
 class EventHistoryHandler:
 

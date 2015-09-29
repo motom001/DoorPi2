@@ -6,6 +6,7 @@ from resources.logging import DoorPiMemoryLog, init_own_logger
 logger = init_own_logger(__name__)
 
 import time, os
+import string, random # used by event_id
 import main
 
 class CorruptConfigFileException(Exception): pass
@@ -30,6 +31,7 @@ class DoorPi(object):
     pidfile_timeout = ''
 
     _start_as_daemon = True
+    _core_documentation = None
 
     @property
     def logger(self): return self._logger
@@ -43,9 +45,18 @@ class DoorPi(object):
     def arguments(self): return self._argumentes
     @property
     def CONST(self): return main.CONST
+    @property
+    def libraries(self): return {'libraries': []} if self._core_documentation is None else self._core_documentation['libraries']
+    @property
+    def modules_destroyed(self):
+        if self.events is None: return True
+        return self.events.idle
 
     @staticmethod
     def parse_string(raw_string, kwargs = None): return main.parse_string(raw_string, kwargs)
+    @staticmethod
+    def generate_id(size = 6, chars = string.ascii_uppercase + string.digits, prefix = '', postfix = ''):
+        return prefix+''.join(random.choice(chars) for _ in range(size))+postfix
 
     def __init__(self,):
         pass
@@ -75,6 +86,8 @@ class DoorPi(object):
         from resources.event_handler import EventHandler
         from resources.interface_handler import InterfaceHandler
 
+        self._core_documentation = ConfigHandler.get_module_documentation_by_module_name(__name__)
+
         #try:
         self._config_handler = ConfigHandler()
         self._event_handler = EventHandler()
@@ -92,13 +105,41 @@ class DoorPi(object):
         logger.debug('start')
         self._start_as_daemon = start_as_daemon
         if not self._prepared: return False
-        while self._event_handler.heart_beat(): pass
+
+        self.events.register_events(__name__)
+
+        event_arguments = {'start_as_daemon': 'daemon' if start_as_daemon else 'application'}
+        self.events.fire_event(__name__, 'BeforeStartup', kwargs = event_arguments)
+        self.events.fire_event_synchron(__name__, 'OnStartup', kwargs = event_arguments)
+        self.events.fire_event(__name__, 'AfterStartup', kwargs = event_arguments)
+
+        while self._event_handler.heart_beat():
+            pass
         return self
 
-    def destroy(self):
+    def stop(self):
         logger.debug('stop')
+        logger.debug("Threads before starting shutdown: %s", self.events.threads)
+
+        self.events.fire_event(__name__, 'BeforeShutdown')
+        self.events.fire_event_synchron(__name__, 'OnShutdown')
+        self.events.fire_event(__name__, 'AfterShutdown')
+
+        timeout = self.CONST.DOORPI_SHUTDOWN_TIMEOUT
+        waiting_between_checks = self.CONST.DOORPI_SHUTDOWN_TIMEOUT_CHECK_INTERVAL
+
+        time.sleep(waiting_between_checks)
+        while timeout > 0 and not self.modules_destroyed:
+        #while not self.event_handler.idle and timeout > 0 and len(self.event_handler.sources) > 1:
+            logger.info('wait %s seconds for threads: %s', timeout, self.events.threads[1:])
+            time.sleep(waiting_between_checks)
+            timeout -= waiting_between_checks
+
+        if timeout <= 0:
+            logger.warning("waiting for threads to time out - there are still threads: %s", self.events.threads[1:])
+
+        logger.info('======== DoorPi successfully shutdown ========')
         if self.logger: self.logger.close()
-        if not self._start_as_daemon: logger.info('======== DoorPi successfully shutdown ========')
         return self
 
     def restart_module(self, module_name):
@@ -135,5 +176,5 @@ class DoorPi(object):
         return new_logger
 
     run = start
-    stop = destroy
+    destroy = stop
     #__del__ = stop

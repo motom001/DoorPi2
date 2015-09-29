@@ -3,56 +3,61 @@
 import threading
 import time # used by: fire_event_synchron
 from inspect import isfunction, ismethod # used by: register_action
-import string, random # used by event_id
+import importlib
+import datetime
 
 from main import DOORPI
 logger = DOORPI.register_module(__name__, return_new_logger = True)
 
-from resources.event_handler.docs import DOCUMENTATION as EVENT_HANDLER_DOCUMENTATION
-from resources.event_handler.classes import SingleAction, EventHistoryHandler
-from resources.event_handler.time_tick import TimeTicker
+#from resources.event_handler.docs import DOCUMENTATION as EVENT_HANDLER_DOCUMENTATION
+from resources.event_handler.classes import ActionBaseClass, EventBaseClass
+#from resources.event_handler.time_tick import TimeTicker
 
-class ControlPulseAction(SingleAction): pass
+class ControlPulseAction(ActionBaseClass): pass
+class LogRealtimeAction(ActionBaseClass): pass
+class MissingEventDocumentationException(Exception): pass
 
 class EventHandler:
 
     _conf = []
     _history = None
 
-    _sources = [] # Auflistung Sources
-    _events = {} # Zuordnung Event zu Sources (1 : n)
-    _actions = {} # Zuordnung Event zu Actions (1: n)
+    _events = {}  # Auflistung aller Event - Key ist EventName
+    _actions = {} # Auflistung aller Actions - Key ist action id
 
     _destroy = False
 
-    _time_ticker = TimeTicker()
     _last_heart_beat = 1
+    _last_time_tick = 0
+    _last_realtime_event = 0
 
     @property
-    def get_action_class(self): return SingleAction
-
+    def events(self): return self._events
+    @property
+    def actions(self): return self._actions
+    @property
+    def action_base_class(self): return ActionBaseClass
     @property
     def pulse(self): return 1 / self._last_heart_beat
-
     @property
-    def random_id(self): return self.generate_id()
-
-    @staticmethod
-    def generate_id(size = 6, chars = string.ascii_uppercase + string.digits):
-        return ''.join(random.choice(chars) for _ in range(size))
+    def threads(self): return threading.enumerate()
+    @property
+    def idle(self): return len(self.threads) - 1 is 0
 
     def __init__(self):
         DOORPI.register_module(__name__, self.start, self.stop, False)
 
     def start(self):
         logger.debug("start EventHandler")
-        self._conf = DOORPI.config.get_modul_config(__name__)
-        self._history = EventHistoryHandler().start(
-            db_type =           DOORPI.config('/resources/event_handler/event_log/typ', 'sqlite'),
-            connection_string = DOORPI.config('/resources/event_handler/event_log/connection_string', '!BASE_PATH!/conf/event_log.db'),
-        )
-        self._time_ticker = TimeTicker().start()
-        DOORPI.events.register_action('OnTimeSecond', ControlPulseAction(self.control_pulse))
+        #self._conf = DOORPI.config.get_modul_config(__name__)
+        #self._history = EventHistoryHandler().start(
+        #    db_type =           DOORPI.config('/resources/event_handler/event_log/type', 'sqlite'),
+        #    connection_string = DOORPI.config('/resources/event_handler/event_log/connection_string', '!BASE_PATH!/conf/event_log.db'),
+        #)
+
+        DOORPI.events.register_events(__name__)
+        DOORPI.events.register_action(ControlPulseAction(self.control_pulse), 'OnTimeSecond')
+        #DOORPI.events.register_action(LogRealtimeAction(self.log_realtime_event), 'OnTimeTick')
         return self
 
     def log_realtime_event(self):
@@ -69,95 +74,222 @@ class EventHandler:
     def stop(self):
         logger.info('stop event handler')
         self._destroy = True
-        self._time_ticker.stop()
         self._history.stop()
         return self
 
     def heart_beat(self):
-        start = time.time()
-        self._time_ticker.do_tick_tack(time_for_this_tick = self._last_heart_beat * 0.5 + DOORPI.CONST.HEART_BEAT_BASE_VALUE)
-        self._last_heart_beat = time.time() - start
+
+        timestamp_now = time.time()
+        timestamp_past = self._last_time_tick
+
+        datetime_now = datetime.datetime.fromtimestamp(timestamp_now)
+        datetime_past = datetime.datetime.fromtimestamp(timestamp_past)
+
+        if datetime_now.year != datetime_past.year:
+            DOORPI.events('OnTimeYear', __name__)
+            if datetime_now.year % 2 is 0:      self('OnTimeYearEvenNumber', __name__)
+            else:                               self('OnTimeYearUnevenNumber', __name__)
+
+        if datetime_now.month != datetime_past.month:
+            DOORPI.events('OnTimeMonth', __name__)
+            if datetime_now.month % 2 is 0:     self('OnTimeMonthEvenNumber', __name__)
+            else:                               self('OnTimeMonthUnevenNumber', __name__)
+
+        if datetime_now.day != datetime_past.day:
+            DOORPI.events('OnTimeDay', __name__)
+            if datetime_now.day % 2 is 0:       self('OnTimeDayEvenNumber', __name__)
+            else:                               self('OnTimeDayUnevenNumber', __name__)
+
+        if datetime_now.hour != datetime_past.hour:
+            DOORPI.events('OnTimeHour', __name__)
+            if datetime_now.hour % 2 is 0:      self('OnTimeHourEvenNumber', __name__)
+            else:                               self('OnTimeHourUnevenNumber', __name__)
+
+            for hour in DOORPI.CONST.HOUR_RANGE:
+                if hour is datetime_now.hour:   self('OnTimeHour%s'%hour, __name__)
+
+        if datetime_now.minute != datetime_past.minute:
+            DOORPI.events('OnTimeMinute', __name__)
+            if datetime_now.minute % 2 is 0:    self('OnTimeMinuteEvenNumber', __name__)
+            else:                               self('OnTimeMinuteUnevenNumber', __name__)
+
+            for minute in DOORPI.CONST.MINUTE_RANGE:
+                if minute is datetime_now.minute: self('OnTimeMinute%s'%minute, __name__)
+
+            if datetime_now.minute % 5 is 0:    self('OnTimeMinuteEvery5', __name__)
+
+        if datetime_now.second != datetime_past.second:
+            DOORPI.events('OnTimeSecond', __name__)
+            if datetime_now.second % 2 is 0:    self('OnTimeSecondEvenNumber', __name__)
+            else:                               self('OnTimeSecondUnevenNumber', __name__)
+
+        microsecond = datetime_now.microsecond / 100000
+        if (microsecond % 2 is 0 or microsecond is 0) and microsecond is not self._last_realtime_event:
+            self._last_realtime_event = microsecond
+            DOORPI.events('OnTimeTick', __name__)
+
+        sleep_time = (self._last_heart_beat * 0.5 + DOORPI.CONST.HEART_BEAT_BASE_VALUE) - (timestamp_now - time.time())
+        if sleep_time > 0: time.sleep(sleep_time)
+
+        self._last_time_tick = timestamp_now
+        self._last_heart_beat = time.time() - timestamp_now
         return not self._destroy
 
     def log_for_event(self, event_name):
         return 'OnTime' not in event_name
 
-    def register_source(self, event_source):
-        if event_source not in self._sources:
-            self._sources.append(event_source)
-            logger.debug("event_source %s was added", event_source)
+    def get_events_for_source(self, source_name):
+        event_list = []
+        for event_name in self._events.keys():
+            if source_name in self._events[event_name].sources:
+                event_list.append(event_name)
+        return event_list
+
+    def get_actions_for_source(self, source_name):
+        action_list = []
+        for action_id in self._actions.keys():
+            if source_name in self._actions[action_id].module:
+                action_list.append(action_id.name)
+        return action_list
+
+    def _register_event(self, module_name, event_name):
+        if event_name not in self._events.keys():
+            self._events[event_name] = EventBaseClass(
+                event_name = event_name
+            )
+
+        if module_name and module_name not in self._events[event_name].sources:
+            self._events[event_name].sources.append(module_name)
+
         return True
 
-    def register_event(self, event_name, event_source):
-        log = self.log_for_event(event_name)
-        if log: logger.debug("register Event %s from %s ", event_name, event_source)
-        self.register_source(event_source)
-        if event_name not in self._events:
-            self._events[event_name] = [event_source]
-            if log: logger.debug("added event_name %s and registered source %s", event_name, event_source)
-        elif event_source not in self._events[event_name]:
-            self._events[event_name].append(event_source)
-            if log: logger.debug("added event_source %s to existing event %s", event_source, event_name)
+    def register_events(self, module_name, *event_names):
+        try:
+            module_documentation = DOORPI.config.get_module_documentation_by_module_name(module_name)
+            for event_dict in module_documentation['events']:
+                self._register_event(module_name, event_dict['name'])
+        except:
+            pass
+
+        for event_name in event_names:
+            self._register_event(module_name, event_name)
+
+        if module_name is not None:
+            logger.debug('%s has now %s events: %s', module_name, len(self.get_events_for_source(module_name)), self.get_events_for_source(module_name))
+        return True
+
+    def get_event_default_parameters(self, event_name, event_source):
+        module_documentation = DOORPI.config.get_module_documentation_by_module_name(event_source)
+        for event_dict in module_documentation['events']:
+            if event_dict['name'] != event_name: continue
+            if 'parameter' in event_dict:
+                return event_dict['parameter']
+        return []
+
+    def unregister_event(self, event_name, event_source):
+        if event_name not in self._events: return False
+        if event_source not in self._events[event_name].sources: return False
+
+        self._events[event_name].sources.remove(event_source)
+
+        if len(self._events[event_name].sources) == 0 and len(self._events[event_name].actions) == 0:
+            logger.debug('remove event %s because there are no more sources and actions for this event', event_name)
+            del self._events[event_name]
+
+        return True
+
+    def unregister_source(self, event_source):
+        #for action_id in self._actions.keys():
+        #    if event_source == self._actions[action_id]:
+        #        self.unregister_action(action_id)
+        for event_name in self._events.keys():
+            self.unregister_event(event_name, event_source)
+        return True
+
+    def register_action(self, action_object, *event_names, **kwargs):
+        if isinstance(action_object, ActionBaseClass):
+            logger.error('action_object isinstance of ActionBaseClass')
+        elif callable(action_object) and (ismethod(action_object) or isfunction(action_object)):
+            action_object = ActionBaseClass(action_object, **kwargs)
         else:
-            if log: logger.debug("nothing to do - event %s from source %s is already known", event_name, event_source)
+            try:
+                logger.debug("action_object: %s", action_object)
+                action_object = ActionBaseClass(
+                    callback = importlib.import_module("plugins.actions.%s"%action_object['action']).__action__,
+                    id = action_object['name'],
+                    kwargs = {} if 'parameters' not in action_object else action_object['parameters']
+                )
+            except Exception as exp:
+                logger.exception('failed to create action_object from config (%s)', exp)
+                return False
+
+        self._actions[action_object.id] = action_object
+
+
+        for event_name in event_names:
+            self._register_event(None, event_name)
+            if action_object.id not in self._events[event_name].actions:
+                self._events[event_name].actions.append(action_object.id)
+                logger.debug("action '%s' was added to event %s", str(action_object), event_name)
+
+        return action_object
+
+    def unregister_action(self, action_id):
+        if action_id not in self._actions: return False
+        action_name = self._actions[action_id].name
+        for event_name in self._events.keys():
+            if action_id in self._events[event_name].actions:
+                logger.debug('[%s] remove action %s from event %s', action_id, action_name, event_name)
+                del self._events[event_name].actions[action_id]
+        logger.debug('[%s] remove action %s', action_id, action_name)
+        del self._actions[action_id]
+        return True
 
     def fire_event(self, event_name, event_source, syncron = False, kwargs = None):
-        if syncron is False: return self.fire_event_asynchron(event_name, event_source, kwargs)
-        else: return self.fire_event_synchron(event_name, event_source, kwargs)
+        if syncron is False: return self.fire_event_asynchron(event_source, event_name, kwargs)
+        else: return self.fire_event_synchron(event_source, event_name, kwargs)
 
-    def fire_event_asynchron(self, event_name, event_source, kwargs = None):
-        log = self.log_for_event(event_name)
-        if self._destroy and not silent: return False
-        if log: logger.debug("fire Event %s from %s asyncron", event_name, event_source)
+    def fire_event_asynchron(self, event_source, event_name, kwargs = None):
         return threading.Thread(
             target = self.fire_event_synchron,
             args = (event_name, event_source, kwargs),
-            name = "%s from %s" % (event_name, event_source)
+            name = "%s from %s with kwargs %s" % (event_source, event_name, kwargs)
         ).start()
 
-    def fire_event_synchron(self, event_name, event_source, kwargs = None):
+    def fire_event_synchron(self, event_source, event_name, kwargs = None):
+        if self._destroy and event_source != __name__: return False
         log = self.log_for_event(event_name)
-        if self._destroy and log: return False
 
-        event_fire_id = self.random_id
-        start_time = time.time()
-
-        if event_source not in self._sources:
-            logger.warning('[%s] source %s unknown - skip fire_event %s', event_fire_id, event_source, event_name)
-            return "source unknown"
-        if event_name not in self._events:
-            logger.warning('[%s] event %s unknown - skip fire_event %s from %s', event_fire_id, event_name, event_name, event_source)
-            return "event unknown"
-        if event_source not in self._events[event_name]:
-            logger.warning('[%s] source %s unknown for this event - skip fire_event %s from %s', event_fire_id, event_name, event_name, event_source)
-            return "source unknown for this event"
-        if event_name not in self._actions:
-            if log: logger.debug('[%s] no actions for event %s - skip fire_event %s from %s', event_fire_id, event_name, event_name, event_source)
-            return "no actions for this event"
+        event_fire_id = DOORPI.generate_id(prefix = 'Event_')
 
         if kwargs is None: kwargs = {}
-        # TODO: Hole auch die default Parameter aus dem doc
         kwargs.update({
-            'last_fired': str(start_time),
+            'last_fired': time.time(),
             'last_fired_from': event_source,
             'event_fire_id': event_fire_id
         })
 
-        #self.__additional_informations[event_name] = kwargs
-        #if 'last_finished' not in self.__additional_informations[event_name]:
-        #    self.__additional_informations[event_name]['last_finished'] = None
-        #
-        #if 'last_duration' not in self.__additional_informations[event_name]:
-        #    self.__additional_informations[event_name]['last_duration'] = None
+        message = ''
+        if event_name not in self._events.keys():                     message = 'unknown event'
+        elif event_source not in self._events[event_name].sources:    message = 'unknown source for this event'
+        elif len(self._events[event_name].actions) == 0:              message = 'no actions for this event'
+        if message != '':
+            message = '[%s] %s - skip fire event %s from %s'%(event_fire_id, message, event_name, event_source)
+            if log: logger.info(message)
+            return message
 
-        if log: logger.debug("[%s] fire for event %s this actions %s ", event_fire_id, event_name, self._actions[event_name])
-        for action in self._actions[event_name]:
-            if log: logger.debug("[%s] try to fire action %s", event_fire_id, action)
+        if log: logger.debug("[%s] fire for event %s from %s this actions %s with kwargs %s",
+                             event_fire_id, event_name, event_source, self._events[event_name].actions, kwargs)
+
+        for action_id in self._events[event_name].actions:
+            if action_id not in self._actions.keys():
+                logger.error('[%s] missing action reference for action_id %s by event %s', event_fire_id, action_id, event_name)
+                continue
+            if log: logger.debug("[%s] try to fire action %s", event_fire_id, self._actions[action_id])
             try:
-                result = action.run(not log)
-                #if log: self.db.insert_action_log(event_fire_id, action.name, start_time, result)
-                # TODO: Besser aufräumen !
-                if action.single_fire_action is True: del action
+                result = self._actions[action_id].run(**kwargs)
+                if not result and log: logger.warning('[%s] action %s returns %s', event_fire_id, self._actions[action_id], result)
+                if self._actions[action_id].single_fire_action is True: self.unregister_action(action_id)
             except SystemExit as exp:
                 logger.info('[%s] Detected SystemExit and shutdown DoorPi (Message: %s)', event_fire_id, exp)
                 DOORPI.stop()
@@ -165,70 +297,10 @@ class EventHandler:
                 logger.info("[%s] Detected KeyboardInterrupt and shutdown DoorPi (Message: %s)", event_fire_id, exp)
                 DOORPI.stop()
             except:
-                logger.exception("[%s] error while fire action %s for event_name %s", event_fire_id, action, event_name)
-        if log: logger.debug("[%s] finished fire_event for event_name %s", event_fire_id, event_name)
-        #self.__additional_informations[event_name]['last_finished'] = str(time.time())
-        #self.__additional_informations[event_name]['last_duration'] = str(time.time() - start_time)
+                logger.exception("[%s] error while fire action %s for event_name %s", event_fire_id, self._actions[action_id], event_name)
+        if log: logger.debug("[%s] finished fire_event for event %s from %s", event_fire_id, event_name, event_source)
         return True
 
-    def unregister_event(self, event_name, event_source, delete_source_when_empty = True):
-        try:
-            logger.trace("unregister Event %s from %s ", event_name, event_source)
-            if event_name not in self.__Events: return "event unknown"
-            if event_source not in self.__Events[event_name]: return "source not know for this event"
-            self.__Events[event_name].remove(event_source)
-            if len(self.__Events[event_name]) is 0:
-                del self.__Events[event_name]
-                logger.debug("no more sources for event %s - remove event too", event_name)
-            if delete_source_when_empty: self.unregister_source(event_source)
-            logger.debug("event_source %s was removed for event %s", event_source, event_name)
-            return True
-        except Exception as exp:
-            logger.error('failed to unregister event %s with error message %s', event_name, exp)
-            return False
-
-    def unregister_source(self, event_source, force_unregister = False):
-        try:
-            logger.debug("unregister Eventsource %s and force_unregister is %s", event_source, force_unregister)
-            if event_source not in self.__Sources: return "event_source %s unknown" % (event_source)
-            for event_name in self.__Events.keys():
-                if event_source in self.__Events[event_name] and force_unregister:
-                    self.unregister_event(event_name, event_source, False)
-                elif event_source in self.__Events[event_name] and not force_unregister:
-                    return "couldn't unregister event_source %s because it is used for event %s" % (event_source, event_name)
-            if event_source in self.__Sources:
-                # sollte nicht nötig sein, da es entfernt wird, wenn das letzte Event dafür gelöscht wird
-                self.__Sources.remove(event_source)
-            logger.debug("event_source %s was removed", event_source)
-            return True
-        except Exception as exp:
-            logger.exception('failed to unregister source %s with error message %s', event_source, exp)
-            return False
-
-    def register_action(self, event_name, action_object, *args, **kwargs):
-        if ismethod(action_object) and callable(action_object):
-            action_object = SingleAction(action_object, *args, **kwargs)
-        elif isfunction(action_object) and callable(action_object):
-            action_object = SingleAction(action_object, *args, **kwargs)
-        elif not isinstance(action_object, SingleAction):
-            action_object = SingleAction.from_string(action_object)
-
-        if action_object is None:
-            logger.error('action_object is None')
-            return False
-
-        if 'single_fire_action' in kwargs.keys() and kwargs['single_fire_action'] is True:
-            action_object.single_fire_action = True
-            del kwargs['single_fire_action']
-
-        if event_name in self._actions:
-            self._actions[event_name].append(action_object)
-            logger.debug("action %s was added to event %s", action_object, event_name)
-        else:
-            self._actions[event_name] = [action_object]
-            logger.debug("action %s was added to new evententry %s", action_object, event_name)
-
-        return action_object
 
     __call__ = fire_event_asynchron
 

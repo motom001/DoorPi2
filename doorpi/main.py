@@ -18,7 +18,7 @@ from resources.core import DoorPi, CorruptConfigFileException
 DOORPI = Singleton(DoorPi)
 
 from resources.logging import init_own_logger
-logging.basicConfig(level = logging.DEBUG, format = CONST.LOG_FORMAT)
+logging.basicConfig(level=logging.DEBUG, format=CONST.LOG_FORMAT)
 logger = init_own_logger(__name__)
 
 import resources.daemon as DAEMON
@@ -35,7 +35,7 @@ def parse_string(raw_string, kwargs = None):
         except: pass
     return raw_string
 
-if __name__ == '__main__':
+def entry_point():
     print(CONST.META.epilog)
 
     possible_loglevels = map(logging.getLevelName, range(0, 51, 10))
@@ -121,3 +121,6 @@ if __name__ == '__main__':
     finally:                                                DOORPI.stop()
 
     logger.info('finished')
+
+if __name__ == '__main__':
+    raise SystemExit(entry_point())
